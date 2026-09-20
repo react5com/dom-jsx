@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "declaration": true,
+    "declarationDir": "dist",
+    "emitDeclarationOnly": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@react5/dom-jsx",
+    "types": ["node"],
+    "paths": {
+      "@react5/dom-jsx/jsx-runtime": ["./src/jsx-runtime.d.ts"],
+      "@react5/dom-jsx/jsx-dev-runtime": ["./src/jsx-dev-runtime.d.ts"]
+    }
+  },
+  "include": ["src", "tests", "fixtures"]
+}

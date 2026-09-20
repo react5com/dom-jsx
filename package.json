@@ -1,0 +1,54 @@
+{
+  "name": "@react5/dom-jsx",
+  "version": "0.1.1",
+  "description": "JSX runtime for vanilla TS/JS projects.",
+  "keywords": [
+    "JSX"
+  ],
+  "homepage": "https://github.com/react5com/dom-jsx#readme",
+  "bugs": {
+    "url": "https://github.com/react5com/dom-jsx/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/react5com/dom-jsx.git"
+  },
+  "license": "MIT",
+  "author": "react5.com",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.0",
+    "terser": "^5.51.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}
