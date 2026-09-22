@@ -21,6 +21,30 @@ For TypeScript automatic JSX, set these compiler options:
 
 The runtime also works with Vite. Vite discovers the package's ESM `jsx-runtime` and `jsx-dev-runtime` exports automatically when compiling TSX.
 
+Function components may return DOM nodes with an attached API:
+
+```tsx
+type ModalContext = { open(): void; close(): void }
+
+function Modal() {
+  const element = <dialog /> as HTMLDialogElement
+
+  return Object.assign(element, {
+    open: () => element.showModal(),
+    close: () => element.close()
+  }) satisfies HTMLDialogElement & ModalContext
+}
+
+const modal = <Modal />
+modal.open()
+```
+
+TypeScript represents all JSX expressions with one `JSX.Element` type, so it
+cannot preserve the exact intersection type of an individual component in
+TSX. The library's JSX element type therefore permits component-specific
+properties. Calling the component directly, or calling `jsx(Modal, null)`,
+preserves its exact return type.
+
 ## Runtime behavior
 
 Intrinsic JSX tags become DOM elements. `class` sets `className`, `style` accepts a style object, DOM properties are assigned when available, boolean attributes use presence semantics, and `onClick`-style function props become event listeners. Text, nested nodes, arrays, fragments, and function components are supported; `null`, `undefined`, and boolean children are ignored.

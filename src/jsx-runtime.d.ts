@@ -2,15 +2,24 @@ export type DOMEventHandler<T extends EventTarget, E extends Event> = (
   event: E & { currentTarget: T }
 ) => void
 
-export type EventProps<T extends HTMLElement> = {
-  onClick?: DOMEventHandler<T, MouseEvent>
-  onInput?: DOMEventHandler<T, InputEvent>
-  onChange?: DOMEventHandler<T, Event>
-  onFocus?: DOMEventHandler<T, FocusEvent>
-  onBlur?: DOMEventHandler<T, FocusEvent>
-  onKeyDown?: DOMEventHandler<T, KeyboardEvent>
-  onKeyUp?: DOMEventHandler<T, KeyboardEvent>
+type MappedEventProps<T extends HTMLElement> = {
+  [K in keyof HTMLElementEventMap as
+    `on${Capitalize<K & string>}`]?: DOMEventHandler<
+      T,
+      HTMLElementEventMap[K]
+    >
 }
+
+export type EventProps<T extends HTMLElement> =
+  Omit<MappedEventProps<T>, 'onInput' | 'onDblclick'> & {
+    // HTMLElementEventMap types input as Event, but InputEvent is more useful
+    // for the input events handled by this runtime.
+    onInput?: DOMEventHandler<T, InputEvent>
+
+    // Capitalize<> only changes the first character, while JSX conventions
+    // use onDblClick for the dblclick event.
+    onDblClick?: DOMEventHandler<T, MouseEvent>
+  }
 
 export type ElementProps<T extends HTMLElement> =
   Partial<Omit<T, 'children' | 'style' | 'className'>> &
@@ -21,19 +30,22 @@ export type ElementProps<T extends HTMLElement> =
   }
 
 export namespace JSX {
-  type Element = Node
+  // TypeScript cannot preserve a function component's concrete return type
+  // for a JSX expression. Keep DOM-node members and permit component APIs.
+  type Element = Node & Record<string, any>
 
   type IntrinsicElements = {
     [K in keyof HTMLElementTagNameMap]: ElementProps<HTMLElementTagNameMap[K]>
-  } & {
-    form: ElementProps<HTMLFormElement> & {
-      onSubmit?: DOMEventHandler<HTMLFormElement, SubmitEvent>
-    }
   }
 }
 
+export declare function jsx<R extends Node>(
+  tag: (props: any) => R,
+  props: import('./jsx-runtime').Props | null,
+  key?: string | number
+): R
 export declare function jsx(
-  tag: string | ((props: any) => Node),
+  tag: string,
   props: import('./jsx-runtime').Props | null,
   key?: string | number
 ): Node
