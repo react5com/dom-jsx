@@ -54,8 +54,9 @@ export function createRef<T>(): { current: T | null } {
 export namespace JSX {
   // TypeScript uses this type for every JSX expression. It cannot preserve
   // the concrete return type of a function component here, so keep the DOM
-  // node type while allowing components to attach their own API.
-  export type Element = Node & Record<string, any>
+  // node type while allowing components to attach a `context` property for
+  // their own API, without opening up arbitrary properties on the node itself.
+  export type Element = Node & { context?: Record<string, any> }
 
   export type IntrinsicElements = {
     [K in keyof HTMLElementTagNameMap]: ElementProps<HTMLElementTagNameMap[K]>

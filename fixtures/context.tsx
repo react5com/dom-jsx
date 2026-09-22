@@ -4,13 +4,14 @@ type ModalContext = { open(): void; close(): void }
 
 function Modal() {
   const element = <dialog /> as HTMLDialogElement
-
-  return Object.assign(element, {
+  const context: ModalContext = {
     open: () => element.showModal(),
     close: () => element.close()
-  }) satisfies HTMLDialogElement & ModalContext
+  }
+
+  return Object.assign(element, {context}) satisfies HTMLDialogElement & {context: ModalContext}
 }
 
 export const modal = <Modal />
-export const opened = modal.open()
-export const direct = jsx(Modal, null).open()
+export const opened = modal.context?.open()
+export const direct = jsx(Modal, null).context.open()

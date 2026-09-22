@@ -14,8 +14,8 @@
     "jsxImportSource": "@react5/dom-jsx",
     "types": ["node"],
     "paths": {
-      "@react5/dom-jsx/jsx-runtime": ["./src/jsx-runtime.d.ts"],
-      "@react5/dom-jsx/jsx-dev-runtime": ["./src/jsx-dev-runtime.d.ts"]
+      "@react5/dom-jsx/jsx-runtime": ["./src/jsx-runtime.ts"],
+      "@react5/dom-jsx/jsx-dev-runtime": ["./src/jsx-dev-runtime.ts"]
     }
   },
   "include": ["src", "tests", "fixtures"]

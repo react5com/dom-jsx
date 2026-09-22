@@ -28,22 +28,29 @@ type ModalContext = { open(): void; close(): void }
 
 function Modal() {
   const element = <dialog /> as HTMLDialogElement
-
-  return Object.assign(element, {
+  const context: ModalContext = {
     open: () => element.showModal(),
     close: () => element.close()
-  }) satisfies HTMLDialogElement & ModalContext
+  }
+
+  return Object.assign(element, { context }) satisfies
+    HTMLDialogElement & { context: ModalContext }
 }
 
 const modal = <Modal />
-modal.open()
+modal.context?.open()
 ```
 
 TypeScript represents all JSX expressions with one `JSX.Element` type, so it
 cannot preserve the exact intersection type of an individual component in
-TSX. The library's JSX element type therefore permits component-specific
-properties. Calling the component directly, or calling `jsx(Modal, null)`,
-preserves its exact return type.
+TSX. The library's JSX element type therefore allows an optional `context`
+property, typed loosely as `Record<string, any>`, on every JSX result.
+Accessing any other property directly on the node (e.g. a typo'd DOM
+property) is still checked normally. `context` is optional because plain
+intrinsic elements don't have one, so calling through it via `<Tag />` JSX
+syntax needs `?.`. To get the component's exact, non-optional `context`
+type instead, call the component directly or call `jsx(Modal, null)` /
+`jsxDEV(Modal, null)`.
 
 ## Runtime behavior
 
