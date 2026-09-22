@@ -45,29 +45,12 @@ export function createRef<T>(): { current: T | null } {
 export namespace JSX {
   export type Element = Node
 
-  export interface IntrinsicElements {
-    div: ElementProps<HTMLDivElement>
-    span: ElementProps<HTMLSpanElement>
-    form: ElementProps<HTMLFormElement> & { onSubmit?: DOMEventHandler<HTMLFormElement, SubmitEvent> }
-    label: ElementProps<HTMLLabelElement>
-    input: ElementProps<HTMLInputElement>
-    textarea: ElementProps<HTMLTextAreaElement>
-    select: ElementProps<HTMLSelectElement>
-    option: ElementProps<HTMLOptionElement>
-    button: ElementProps<HTMLButtonElement>
-    a: ElementProps<HTMLAnchorElement>
-    h1: ElementProps<HTMLHeadingElement>
-    h2: ElementProps<HTMLHeadingElement>
-    h3: ElementProps<HTMLHeadingElement>
-    p: ElementProps<HTMLParagraphElement>
-    ul: ElementProps<HTMLUListElement>
-    ol: ElementProps<HTMLOListElement>
-    li: ElementProps<HTMLLIElement>
-    section: ElementProps<HTMLElement>
-    article: ElementProps<HTMLElement>
-    header: ElementProps<HTMLElement>
-    footer: ElementProps<HTMLElement>
-    main: ElementProps<HTMLElement>
+  export type IntrinsicElements = {
+    [K in keyof HTMLElementTagNameMap]: ElementProps<HTMLElementTagNameMap[K]>
+  } & {
+    form: ElementProps<HTMLFormElement> & {
+      onSubmit?: DOMEventHandler<HTMLFormElement, SubmitEvent>
+    }
   }
 }
 
