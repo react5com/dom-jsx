@@ -24,31 +24,31 @@ The runtime also works with Vite. Vite discovers the package's ESM `jsx-runtime`
 Function components may return DOM nodes with an attached API:
 
 ```tsx
-type ModalContext = { open(): void; close(): void }
+type ModalApi = { open(): void; close(): void }
 
 function Modal() {
   const element = <dialog /> as HTMLDialogElement
-  const context: ModalContext = {
+  const api: ModalApi = {
     open: () => element.showModal(),
     close: () => element.close()
   }
 
-  return Object.assign(element, { context }) satisfies
-    HTMLDialogElement & { context: ModalContext }
+  return Object.assign(element, { api }) satisfies
+    HTMLDialogElement & { api: ModalApi }
 }
 
 const modal = <Modal />
-modal.context?.open()
+modal.api?.open()
 ```
 
 TypeScript represents all JSX expressions with one `JSX.Element` type, so it
 cannot preserve the exact intersection type of an individual component in
-TSX. The library's JSX element type therefore allows an optional `context`
+TSX. The library's JSX element type therefore allows an optional `api`
 property, typed loosely as `Record<string, any>`, on every JSX result.
 Accessing any other property directly on the node (e.g. a typo'd DOM
-property) is still checked normally. `context` is optional because plain
+property) is still checked normally. `api` is optional because plain
 intrinsic elements don't have one, so calling through it via `<Tag />` JSX
-syntax needs `?.`. To get the component's exact, non-optional `context`
+syntax needs `?.`. To get the component's exact, non-optional `api`
 type instead, call the component directly or call `jsx(Modal, null)` /
 `jsxDEV(Modal, null)`.
 
