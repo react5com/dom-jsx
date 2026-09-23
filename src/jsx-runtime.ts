@@ -106,6 +106,169 @@ export function useContext<T>(context: Context<T>): T {
   return (stack.length > 0 ? stack[stack.length - 1] : defaultValue) as T
 }
 
+// Internal cleanups receive the dispose error list so a group of cleanups can
+// report each failure separately.
+type Cleanup = (errors: unknown[]) => void
+
+const cleanups = new WeakMap<Node, Cleanup[]>()
+
+type Frame = {
+  // Cleanups registered by onCleanup in this component body.
+  cleanups: (() => void)[]
+  // Top-level nodes of components rendered while this one was rendering.
+  rendered: Node[]
+}
+
+// One frame per component currently rendering. onCleanup adds to the top
+// frame; when the component returns, the frame is attached to its node.
+const cleanupFrames: Frame[] = []
+
+function addCleanup(node: Node, cleanup: Cleanup): void {
+  const list = cleanups.get(node)
+  if (list) {
+    list.push(cleanup)
+  } else {
+    cleanups.set(node, [cleanup])
+  }
+}
+
+// Registers fn to run when dispose() is called on node or an ancestor.
+export function onDispose(node: Node, fn: () => void): void {
+  addCleanup(node, () => fn())
+}
+
+// Registers fn to run when the node returned by the component currently
+// rendering is disposed. Call it synchronously in a component body.
+export function onCleanup(fn: () => void): void {
+  const frame = cleanupFrames[cleanupFrames.length - 1]
+  if (!frame) {
+    throw new Error(
+      'onCleanup must be called while a component is rendering; use onDispose(node, fn) instead'
+    )
+  }
+  frame.cleanups.push(fn)
+}
+
+// The DOM gives no synchronous signal when a node is removed, so call this
+// explicitly when discarding content, e.g. old.replaceWith(next); dispose(old).
+// Runs cleanups of every descendant before the node's own, each node's in
+// reverse registration order. A node that is only moved is never disposed.
+export function dispose(node: Node): void {
+  const errors: unknown[] = []
+  disposeTree(node, errors)
+  if (errors.length === 1) {
+    throw errors[0]
+  }
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'Multiple cleanups failed during dispose')
+  }
+}
+
+function disposeTree(node: Node, errors: unknown[]): void {
+  // Snapshot the children: a cleanup may detach nodes.
+  for (const child of Array.from(node.childNodes)) {
+    disposeTree(child, errors)
+  }
+
+  const list = cleanups.get(node)
+  if (!list) {
+    return
+  }
+  cleanups.delete(node)
+  for (let i = list.length - 1; i >= 0; i--) {
+    try {
+      list[i](errors)
+    } catch (error) {
+      errors.push(error)
+    }
+  }
+}
+
+function runCleanups(fns: (() => void)[], errors: unknown[]): void {
+  for (let i = fns.length - 1; i >= 0; i--) {
+    try {
+      fns[i]()
+    } catch (error) {
+      errors.push(error)
+    }
+  }
+}
+
+function collectNodes(value: unknown, nodes: Node[]): void {
+  if (value instanceof Node) {
+    nodes.push(value)
+  } else if (Array.isArray(value)) {
+    for (const item of value) {
+      collectNodes(item, nodes)
+    }
+  }
+}
+
+// Disposes what a failed render leaves behind: its own cleanups, components it
+// rendered, and JSX passed in props, which is created before the component
+// runs. Connected nodes were placed in the document on purpose, so keep them.
+function discardFailedRender(frame: Frame, props: Props): void {
+  const errors: unknown[] = []
+  const nodes: Node[] = [...frame.rendered]
+  for (const value of Object.values(props)) {
+    collectNodes(value, nodes)
+  }
+  for (const node of nodes) {
+    if (!node.isConnected) {
+      disposeTree(node, errors)
+    }
+  }
+  runCleanups(frame.cleanups, errors)
+  // The render error is the one worth reporting, so errors are dropped.
+}
+
+function renderComponent(tag: Component, props: Props): Node {
+  const frame: Frame = { cleanups: [], rendered: [] }
+  cleanupFrames.push(frame)
+  let node: Node
+  try {
+    node = tag(props)
+  } catch (error) {
+    cleanupFrames.pop()
+    discardFailedRender(frame, props)
+    throw error
+  }
+  cleanupFrames.pop()
+
+  // A fragment empties once inserted, so use its top-level children. An empty
+  // fragment gets a comment anchor so its cleanups reach the DOM with it.
+  let targets: Node[] = [node]
+  if (node instanceof DocumentFragment) {
+    if (!node.firstChild && frame.cleanups.length > 0) {
+      node.appendChild(document.createComment(''))
+    }
+    targets = Array.from(node.childNodes)
+  }
+
+  if (frame.cleanups.length > 0) {
+    if (targets.length === 1) {
+      for (const fn of frame.cleanups) {
+        onDispose(targets[0], fn)
+      }
+    } else {
+      // The component is gone only once all of its top-level nodes are
+      // disposed, so run its cleanups when the last one is.
+      let remaining = targets.length
+      for (const target of targets) {
+        addCleanup(target, errors => {
+          if (--remaining === 0) {
+            runCleanups(frame.cleanups, errors)
+          }
+        })
+      }
+    }
+  }
+
+  cleanupFrames[cleanupFrames.length - 1]?.rendered.push(...targets)
+
+  return node
+}
+
 export namespace JSX {
   // TypeScript uses this type for every JSX expression. It cannot preserve
   // the concrete return type of a function component here, so keep the DOM
@@ -151,7 +314,7 @@ function createElement(
   const actualProps = props ?? {}
 
   if (typeof tag === 'function') {
-    return tag(actualProps)
+    return renderComponent(tag, actualProps)
   }
 
   const element = document.createElement(tag)

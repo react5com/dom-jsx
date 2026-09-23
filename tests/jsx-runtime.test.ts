@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createContext, createRef, Fragment, jsx, jsxs, useContext } from '../src/jsx-runtime'
+import {
+  createContext,
+  createRef,
+  type Child,
+  dispose,
+  Fragment,
+  jsx,
+  jsxs,
+  onCleanup,
+  onDispose,
+  useContext
+} from '../src/jsx-runtime'
 import { jsxDEV } from '../src/jsx-dev-runtime'
 
 describe('DOM JSX runtime', () => {
@@ -124,5 +135,240 @@ describe('DOM JSX runtime', () => {
     const Ctx = createContext(0)
     expect(() => jsx(Ctx.Provider as any, { value: 1, children: jsx('span', null) }))
       .toThrow(TypeError)
+  })
+
+  it('runs component cleanups when the returned node is disposed', () => {
+    const cleanup = vi.fn()
+    const Widget = () => {
+      onCleanup(cleanup)
+      return jsx('div', null)
+    }
+    const node = jsx(Widget, null)
+
+    expect(cleanup).not.toHaveBeenCalled()
+    dispose(node)
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('disposes nodes that were never added to the document', () => {
+    const cleanup = vi.fn()
+    const node = jsx('span', null)
+    onDispose(node, cleanup)
+
+    expect(node.isConnected).toBe(false)
+    dispose(node)
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('does not run cleanups when a node is moved', () => {
+    const cleanup = vi.fn()
+    const node = jsx('span', null)
+    onDispose(node, cleanup)
+    const a = jsx('div', null) as HTMLDivElement
+    const b = jsx('div', null) as HTMLDivElement
+    document.body.append(a, b)
+
+    a.append(node)
+    b.append(node)
+    a.remove()
+    dispose(a)
+    expect(cleanup).not.toHaveBeenCalled()
+
+    dispose(b)
+    expect(cleanup).toHaveBeenCalledOnce()
+    b.remove()
+  })
+
+  it('disposes components passed as children, descendants first', () => {
+    const calls: string[] = []
+    const Widget = () => {
+      onCleanup(() => calls.push('widget'))
+      return jsx('span', null)
+    }
+    const Layout = (props: { children?: Child }) => {
+      onCleanup(() => calls.push('layout'))
+      return jsx('section', { children: props.children })
+    }
+    // Widget runs before Layout, so disposal must follow the DOM.
+    const node = jsx(Layout, { children: jsx(Widget, null) })
+
+    dispose(node)
+    expect(calls).toEqual(['widget', 'layout'])
+  })
+
+  it('attaches cleanups of fragment-returning components to the top-level children', () => {
+    const cleanup = vi.fn()
+    const Pair = () => {
+      onCleanup(cleanup)
+      return jsxs(Fragment, { children: [jsx('i', null), jsx('b', null)] })
+    }
+    const container = jsx('div', { children: jsx(Pair, null) })
+    const [first, second] = Array.from(container.childNodes)
+
+    dispose(first)
+    expect(cleanup).not.toHaveBeenCalled()
+    dispose(second)
+    expect(cleanup).toHaveBeenCalledOnce()
+    dispose(container)
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('runs fragment component cleanups once when the whole parent is disposed', () => {
+    const calls: string[] = []
+    const Pair = () => {
+      onCleanup(() => calls.push('a'))
+      onCleanup(() => calls.push('b'))
+      return jsxs(Fragment, { children: [jsx('i', null), jsx('b', null)] })
+    }
+
+    dispose(jsx('div', { children: jsx(Pair, null) }))
+    expect(calls).toEqual(['b', 'a'])
+  })
+
+  it('keeps cleanups of an empty fragment when it is inserted', () => {
+    const cleanup = vi.fn()
+    const Empty = () => {
+      onCleanup(cleanup)
+      return jsx(Fragment, {})
+    }
+    const container = jsx('div', { children: jsx(Empty, null) })
+
+    dispose(container)
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('keeps cleanups of a Provider whose render function returns nothing', () => {
+    const cleanup = vi.fn()
+    const Ctx = createContext(0)
+    const Poller = () => {
+      onCleanup(cleanup)
+      return jsx(Fragment, {})
+    }
+    const container = jsx('div', {
+      children: jsx(Ctx.Provider, { value: 1, children: () => [jsx(Poller, null), null] })
+    })
+
+    dispose(container)
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('does not add an anchor to empty fragments without cleanups', () => {
+    const Empty = () => jsx(Fragment, {})
+    expect(jsx(Empty, null).childNodes).toHaveLength(0)
+  })
+
+  it('keeps the cleanups of every component that returns the same node', () => {
+    const calls: string[] = []
+    const Inner = () => {
+      onCleanup(() => calls.push('inner'))
+      return jsx('div', null)
+    }
+    const Outer = () => {
+      onCleanup(() => calls.push('outer'))
+      return jsx(Inner, null)
+    }
+
+    dispose(jsx(Outer, null))
+    expect(calls).toEqual(['outer', 'inner'])
+  })
+
+  it('runs cleanups of one node in reverse registration order', () => {
+    const calls: number[] = []
+    const Widget = () => {
+      onCleanup(() => calls.push(1))
+      onCleanup(() => calls.push(2))
+      return jsx('div', null)
+    }
+
+    dispose(jsx(Widget, null))
+    expect(calls).toEqual([2, 1])
+  })
+
+  it('runs cleanups only once when disposed twice', () => {
+    const cleanup = vi.fn()
+    const node = jsx('div', null)
+    onDispose(node, cleanup)
+
+    dispose(node)
+    dispose(node)
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('keeps running cleanups when one throws and rethrows afterwards', () => {
+    const later = vi.fn()
+    const child = jsx('span', null)
+    const node = jsx('div', { children: child })
+    onDispose(child, () => { throw new Error('boom') })
+    onDispose(node, later)
+
+    expect(() => dispose(node)).toThrow('boom')
+    expect(later).toHaveBeenCalledOnce()
+  })
+
+  it('reports every error when several cleanups throw', () => {
+    const node = jsx('div', null)
+    onDispose(node, () => { throw new Error('a') })
+    onDispose(node, () => { throw new Error('b') })
+
+    expect(() => dispose(node)).toThrow(AggregateError)
+  })
+
+  it('runs cleanups of a component that throws while rendering', () => {
+    const cleanup = vi.fn()
+    const Broken = () => {
+      onCleanup(cleanup)
+      throw new Error('render failed')
+    }
+
+    expect(() => jsx(Broken, null)).toThrow('render failed')
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('disposes children passed as props when a component throws while rendering', () => {
+    const cleanup = vi.fn()
+    const Ticker = () => {
+      onCleanup(cleanup)
+      return jsx('span', null)
+    }
+    const Parent = (_props: { children?: Child }): Node => {
+      throw new Error('render failed')
+    }
+
+    expect(() => jsx(Parent, { children: jsx(Ticker, null) })).toThrow('render failed')
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
+  it('disposes components rendered in the body when a component throws', () => {
+    const calls: string[] = []
+    const Ticker = () => {
+      onCleanup(() => calls.push('ticker'))
+      return jsx('span', null)
+    }
+    const Parent = () => {
+      onCleanup(() => calls.push('parent'))
+      jsx('div', { children: jsx(Ticker, null) })
+      throw new Error('render failed')
+    }
+
+    expect(() => jsx(Parent, null)).toThrow('render failed')
+    expect(calls).toEqual(['ticker', 'parent'])
+  })
+
+  it('keeps connected nodes when a component throws while rendering', () => {
+    const cleanup = vi.fn()
+    const live = jsx('span', null) as HTMLSpanElement
+    onDispose(live, cleanup)
+    document.body.append(live)
+    const Parent = (_props: { content: Node }): Node => {
+      throw new Error('render failed')
+    }
+
+    expect(() => jsx(Parent, { content: live })).toThrow('render failed')
+    expect(cleanup).not.toHaveBeenCalled()
+    live.remove()
+  })
+
+  it('rejects onCleanup outside of a component render', () => {
+    expect(() => onCleanup(() => {})).toThrow(Error)
   })
 })

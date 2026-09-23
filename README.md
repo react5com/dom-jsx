@@ -59,7 +59,7 @@ Intrinsic JSX tags become DOM elements. `class` sets `className`, `style` accept
 The public entry points are:
 
 ```ts
-import { createRef, createContext, useContext, jsx, jsxs, Fragment } from '@react5/dom-jsx'
+import { createRef, createContext, useContext, onCleanup, onDispose, dispose, jsx, jsxs, Fragment } from '@react5/dom-jsx'
 import { jsx, jsxs, jsxDEV, Fragment } from '@react5/dom-jsx/jsx-dev-runtime'
 ```
 
@@ -115,6 +115,52 @@ Providers can be nested, and the innermost value wins.
 progress. Call it synchronously in a component body and keep the result.
 Called later, for example from an event handler or a `setTimeout`, it
 returns the context's default value.
+
+### Cleanup
+
+Release subscriptions, timers, and other resources when content is discarded.
+Register cleanups with `onCleanup` in a component body, or with
+`onDispose(node, fn)` anywhere else:
+
+```tsx
+import { dispose, onCleanup, onDispose } from '@react5/dom-jsx'
+
+function Clock() {
+  const el = <time /> as HTMLTimeElement
+  const id = setInterval(() => { el.textContent = new Date().toLocaleTimeString() }, 1000)
+  onCleanup(() => clearInterval(id))
+  return el
+}
+
+const node = <Clock />
+onDispose(node, () => console.log('disposed'))
+
+// Later, where content is swapped:
+old.replaceWith(next)
+dispose(old)
+```
+
+The DOM gives no synchronous signal when a node is removed, so `dispose` must
+be called explicitly. It runs the cleanups of the node and of every node inside
+it, descendants first, each node's cleanups in reverse registration order.
+Disposal follows the DOM tree, so components passed as children are covered
+even though they render before their parent. Each cleanup runs at most once;
+if some throw, the rest still run and the error (or an `AggregateError`) is
+rethrown afterwards.
+
+A component's cleanups are attached to the node it returns. When it returns a
+fragment, they are attached to the fragment's top-level children and run once
+all of them are disposed, so dispose every one of them, or a common ancestor.
+An empty fragment gets an empty comment node to carry its cleanups.
+
+If a component throws while rendering, the cleanups it already registered run
+immediately. So do those of components it rendered and of JSX passed to it in
+props, unless those nodes are already in the document.
+
+`onCleanup` throws when called outside a component render, e.g. from an event
+handler or after an `await`; use `onDispose(node, fn)` there. Moving a node
+never disposes it. A node that is discarded without `dispose` keeps its
+cleanups until it is garbage-collected, and they never run.
 
 ## Development
 
