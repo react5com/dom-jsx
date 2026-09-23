@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRef, Fragment, jsx, jsxs } from '../src/jsx-runtime'
+import { createContext, createRef, Fragment, jsx, jsxs, useContext } from '../src/jsx-runtime'
 import { jsxDEV } from '../src/jsx-dev-runtime'
 
 describe('DOM JSX runtime', () => {
@@ -80,5 +80,49 @@ describe('DOM JSX runtime', () => {
     expect(element.getAttribute('aria-hidden')).toBe('true')
     expect(element.getAttribute('aria-expanded')).toBe('false')
     expect(element.getAttribute('data-count')).toBe('3')
+  })
+
+  it('propagates context values to nested components rendered inside a Provider', () => {
+    const Theme = createContext('light')
+    const Label = () => jsx('span', { children: useContext(Theme) })
+
+    expect(jsx(Label, null).textContent).toBe('light')
+
+    const element = jsx(Theme.Provider, {
+      value: 'dark',
+      children: () => jsxs('div', {
+        children: [
+          jsx(Label, null),
+          jsx(Theme.Provider, { value: 'blue', children: () => jsx(Label, null) }),
+          jsx(Label, null)
+        ]
+      })
+    })
+
+    expect(element.textContent).toBe('darkbluedark')
+    expect(jsx(Label, null).textContent).toBe('light')
+  })
+
+  it('wraps non-node Provider results in a fragment and restores context after errors', () => {
+    const Count = createContext(0)
+
+    const fragment = jsx(Count.Provider, {
+      value: 2,
+      children: () => ['n=', useContext(Count)]
+    })
+    expect(fragment).toBeInstanceOf(DocumentFragment)
+    expect(fragment.textContent).toBe('n=2')
+
+    expect(() => jsx(Count.Provider, {
+      value: 5,
+      children: () => { throw new Error('boom') }
+    })).toThrow('boom')
+    expect(useContext(Count)).toBe(0)
+  })
+
+  it('rejects Provider children that are not a render function', () => {
+    const Ctx = createContext(0)
+    expect(() => jsx(Ctx.Provider as any, { value: 1, children: jsx('span', null) }))
+      .toThrow(TypeError)
   })
 })

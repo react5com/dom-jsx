@@ -59,7 +59,7 @@ Intrinsic JSX tags become DOM elements. `class` sets `className`, `style` accept
 The public entry points are:
 
 ```ts
-import { createRef, jsx, jsxs, Fragment } from '@react5/dom-jsx'
+import { createRef, createContext, useContext, jsx, jsxs, Fragment } from '@react5/dom-jsx'
 import { jsx, jsxs, jsxDEV, Fragment } from '@react5/dom-jsx/jsx-dev-runtime'
 ```
 
@@ -83,6 +83,38 @@ inputRef.current // HTMLInputElement
 ```
 
 A callback ref (`ref={(el) => ...}`) is also supported and is invoked with the element once it's created.
+
+### Context
+
+Pass values down to nested components without threading props through every level:
+
+```tsx
+import { createContext, useContext } from '@react5/dom-jsx'
+
+const ThemeContext = createContext({ color: 'black' })
+
+function Title(props: { text: string }) {
+  const theme = useContext(ThemeContext)
+  return <h1 style={{ color: theme.color }}>{props.text}</h1>
+}
+
+const page = (
+  <ThemeContext.Provider value={{ color: 'red' }}>
+    {() => <Title text="Hello" />}
+  </ThemeContext.Provider>
+)
+```
+
+JSX in this runtime is evaluated eagerly from the inside out: children are
+created before their parent component runs. A Provider's child must
+therefore be a render function (`{() => ...}`); the Provider calls it while
+its value is active, so every component rendered inside sees that value.
+Providers can be nested, and the innermost value wins.
+
+`useContext` returns the nearest Provider's value only while rendering is in
+progress. Call it synchronously in a component body and keep the result.
+Called later, for example from an event handler or a `setTimeout`, it
+returns the context's default value.
 
 ## Development
 

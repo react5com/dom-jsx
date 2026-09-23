@@ -15,3 +15,9 @@ function Modal() {
 export const modal = <Modal />
 export const opened = modal.api?.open()
 export const direct = jsx(Modal, null).api.open()
+
+const Greeting = (props: { name: string }) => <p>{props.name}</p>
+
+export const greeting = jsx(Greeting, { name: 'Ada' })
+// @ts-expect-error components with required props reject null props
+export const missingProps = jsx(Greeting, null)

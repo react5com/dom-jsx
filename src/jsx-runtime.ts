@@ -51,6 +51,61 @@ export function createRef<T>(): { current: T | null } {
   return { current: null }
 }
 
+export type ProviderProps<T> = {
+  value: T
+  children: () => Child
+}
+
+export type Context<T> = {
+  Provider: (props: ProviderProps<T>) => Node
+}
+
+const contextStacks = new WeakMap<Context<any>, { defaultValue: unknown, stack: unknown[] }>()
+
+// JSX is evaluated eagerly from the inside out, so children are created before
+// the Provider function runs. Providers therefore take a render function as
+// their child and invoke it while their value is on the stack.
+export function createContext<T>(defaultValue: T): Context<T> {
+  const stack: T[] = []
+
+  const context: Context<T> = {
+    Provider({ value, children }) {
+      if (typeof children !== 'function') {
+        throw new TypeError(
+          'Context Provider expects a single function child: {() => ...}'
+        )
+      }
+
+      stack.push(value)
+      try {
+        const result = children()
+        if (result instanceof Node) {
+          return result
+        }
+        const fragment = document.createDocumentFragment()
+        appendChildren(fragment, result)
+        return fragment
+      } finally {
+        stack.pop()
+      }
+    }
+  }
+
+  contextStacks.set(context, { defaultValue, stack })
+  return context
+}
+
+// Reads the nearest Provider value. Call it synchronously while rendering
+// (e.g. in a component body); after rendering it returns the default value.
+export function useContext<T>(context: Context<T>): T {
+  const entry = contextStacks.get(context)
+  if (!entry) {
+    throw new TypeError('useContext expects a context created by createContext')
+  }
+  const { defaultValue, stack } = entry
+  return (stack.length > 0 ? stack[stack.length - 1] : defaultValue) as T
+}
+
 export namespace JSX {
   // TypeScript uses this type for every JSX expression. It cannot preserve
   // the concrete return type of a function component here, so keep the DOM
@@ -63,9 +118,9 @@ export namespace JSX {
   }
 }
 
-export function jsx<R extends Node>(
-  tag: (props: any) => R,
-  props: Props | null,
+export function jsx<P, R extends Node>(
+  tag: (props: P) => R,
+  props: {} extends P ? P | null : P,
   _key?: string | number
 ): R
 export function jsx(
