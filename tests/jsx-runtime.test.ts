@@ -31,6 +31,19 @@ describe('DOM JSX runtime', () => {
     expect(element.style.marginTop).toBe('2px')
   })
 
+  it('accepts className as an alias for class', () => {
+    const element = jsx('div', { className: 'field' }) as HTMLDivElement
+    expect(element.className).toBe('field')
+  })
+
+  it('prefers className over class when both are given', () => {
+    const element = jsx('div', {
+      class: 'from-class',
+      className: 'from-className'
+    }) as HTMLDivElement
+    expect(element.className).toBe('from-className')
+  })
+
   it('binds event handlers', () => {
     let currentTarget: EventTarget | null = null
     const onClick = vi.fn((event: MouseEvent) => { currentTarget = event.currentTarget })

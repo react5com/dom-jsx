@@ -1,6 +1,6 @@
 /** Compile-time fixture for the standard HTML intrinsic element map. */
 export const elements = (
-  <main>
+  <main className={Math.random() > 0.5 ? 'layout' : undefined}>
     <dialog open />
     <nav />
     <img alt="example" />

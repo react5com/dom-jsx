@@ -70,6 +70,7 @@ export type ElementProps<T extends HTMLElement> =
   Partial<Omit<T, 'children' | 'style' | 'className'>> &
   EventProps<T> & {
     class?: string
+    className?: string
     style?: Partial<CSSStyleDeclaration>
     children?: unknown
     ref?: Ref<T>
@@ -347,6 +348,15 @@ function createElement(
 
   const element = document.createElement(tag)
 
+  // className takes precedence over class when both are given, matching
+  // React convention. Resolved up front so iteration order of actualProps
+  // (an implementation detail) can't affect the outcome.
+  if (actualProps.class !== undefined || actualProps.className !== undefined) {
+    element.className = String(
+      actualProps.className ?? actualProps.class ?? ''
+    )
+  }
+
   for (const [key, value] of Object.entries(actualProps)) {
     if (key === 'children') {
       continue
@@ -364,8 +374,7 @@ function createElement(
       continue
     }
 
-    if (key === 'class') {
-      element.className = String(value ?? '')
+    if (key === 'class' || key === 'className') {
       continue
     }
 
