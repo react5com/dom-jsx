@@ -40,6 +40,31 @@ describe('DOM JSX runtime', () => {
     expect(currentTarget).toBe(element)
   })
 
+  it.each([
+    ['onMouseEnter', 'mouseenter'],
+    ['onMouseLeave', 'mouseleave'],
+    ['onKeyDown', 'keydown'],
+    ['onPointerDown', 'pointerdown'],
+    ['onTouchStart', 'touchstart'],
+    ['onDragOver', 'dragover'],
+    ['onFocusIn', 'focusin'],
+    ['onFocusOut', 'focusout'],
+    ['onCompositionStart', 'compositionstart'],
+    ['onAnimationEnd', 'animationend'],
+    ['onTransitionEnd', 'transitionend'],
+    ['onDblClick', 'dblclick']
+  ])('binds %s to the DOM %s event', (prop, eventName) => {
+    let currentTarget: EventTarget | null = null
+    const handler = vi.fn((event: Event) => { currentTarget = event.currentTarget })
+    const element = jsx('input', { [prop]: handler })
+    const event = new Event(eventName)
+
+    element.dispatchEvent(event)
+
+    expect(handler).toHaveBeenCalledExactlyOnceWith(event)
+    expect(currentTarget).toBe(element)
+  })
+
   it('handles text, nested, arrays, fragments, and ignored boolean children', () => {
     const element = jsxs('div', {
       children: ['Hello ', jsx('strong', { children: 'world' }), false, null, 3]

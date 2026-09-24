@@ -56,6 +56,10 @@ type instead, call the component directly or call `jsx(Modal, null)` /
 
 Intrinsic JSX tags become DOM elements. `class` sets `className`, `style` accepts a style object, DOM properties are assigned when available, boolean attributes use presence semantics, and `onClick`-style function props become event listeners. Text, nested nodes, arrays, fragments, and function components are supported; `null`, `undefined`, and boolean children are ignored.
 
+Compound event props require camel casing, such as `onMouseEnter`, `onMouseLeave`,
+`onFocusIn`, `onFocusOut`, `onKeyDown`, and `onAnimationEnd`.
+Handlers receive the DOM event with `currentTarget` typed as the element.
+
 The public entry points are:
 
 ```ts

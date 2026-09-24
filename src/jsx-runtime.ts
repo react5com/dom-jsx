@@ -17,23 +17,51 @@ export type DOMEventHandler<T extends EventTarget, E extends Event> = (
   event: E & { currentTarget: T }
 ) => void
 
+// DOM event names contain no word boundaries, so spell out compound JSX names.
+type CompoundEventName =
+  | 'AnimationCancel' | 'AnimationEnd' | 'AnimationIteration' | 'AnimationStart'
+  | 'AuxClick' | 'BeforeInput' | 'BeforeMatch' | 'BeforeToggle'
+  | 'CanPlay' | 'CanPlayThrough'
+  | 'CompositionEnd' | 'CompositionStart' | 'CompositionUpdate'
+  | 'ContextLost' | 'ContextMenu' | 'ContextRestored' | 'CueChange' | 'DblClick'
+  | 'DragEnd' | 'DragEnter' | 'DragLeave' | 'DragOver' | 'DragStart'
+  | 'DurationChange' | 'FocusIn' | 'FocusOut' | 'FormData'
+  | 'FullscreenChange' | 'FullscreenError'
+  | 'GotPointerCapture' | 'LostPointerCapture'
+  | 'KeyDown' | 'KeyPress' | 'KeyUp'
+  | 'LoadedData' | 'LoadedMetadata' | 'LoadStart'
+  | 'MouseDown' | 'MouseEnter' | 'MouseLeave' | 'MouseMove' | 'MouseOut' | 'MouseOver' | 'MouseUp'
+  | 'PointerCancel' | 'PointerDown' | 'PointerEnter' | 'PointerLeave'
+  | 'PointerMove' | 'PointerOut' | 'PointerOver' | 'PointerRawUpdate' | 'PointerUp'
+  | 'RateChange' | 'ScrollEnd' | 'SecurityPolicyViolation'
+  | 'SelectionChange' | 'SelectStart' | 'SlotChange' | 'TimeUpdate'
+  | 'TouchCancel' | 'TouchEnd' | 'TouchMove' | 'TouchStart'
+  | 'TransitionCancel' | 'TransitionEnd' | 'TransitionRun' | 'TransitionStart'
+  | 'VolumeChange' | 'WaitingForKey' | 'WebkitAnimationEnd'
+  | 'WebkitAnimationIteration' | 'WebkitAnimationStart' | 'WebkitTransitionEnd'
+
+type CompoundEventNames = {
+  [K in CompoundEventName as Lowercase<K>]: K
+}
+
+type EventPropName<K extends string> =
+  K extends keyof CompoundEventNames
+    ? `on${CompoundEventNames[K]}`
+    : `on${Capitalize<K>}`
+
 type MappedEventProps<T extends HTMLElement> = {
   [K in keyof HTMLElementEventMap as
-    `on${Capitalize<K & string>}`]?: DOMEventHandler<
+    EventPropName<K & string>]?: DOMEventHandler<
       T,
       HTMLElementEventMap[K]
     >
 }
 
 export type EventProps<T extends HTMLElement> =
-  Omit<MappedEventProps<T>, 'onInput' | 'onDblclick'> & {
+  Omit<MappedEventProps<T>, 'onInput'> & {
     // HTMLElementEventMap types input as Event, but InputEvent is more useful
     // for the input events handled by this runtime.
     onInput?: DOMEventHandler<T, InputEvent>
-
-    // Capitalize<> only changes the first character, while JSX conventions
-    // use onDblClick for the dblclick event.
-    onDblClick?: DOMEventHandler<T, MouseEvent>
   }
 
 export type Ref<T> = { current: T | null } | ((el: T) => void)
