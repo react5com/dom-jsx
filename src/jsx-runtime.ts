@@ -450,3 +450,15 @@ function appendChildren(
     )
   }
 }
+
+export function svge(markup: string): SVGSVGElement {
+  const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml')
+  const root = parsed.documentElement
+  if (root.nodeName === 'parsererror' || root.namespaceURI !== 'http://www.w3.org/2000/svg') {
+    throw new Error(`svge: failed to parse SVG markup: ${markup}`)
+  }
+  const icon = document.importNode(root, true) as unknown as SVGSVGElement
+  icon.setAttribute('aria-hidden', 'true')
+  icon.setAttribute('focusable', 'false')
+  return icon
+}
