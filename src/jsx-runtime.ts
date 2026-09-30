@@ -86,7 +86,7 @@ export type ProviderProps<T> = {
 }
 
 export type Context<T> = {
-  Provider: (props: ProviderProps<T>) => Node
+  Provider: (props: ProviderProps<T>) => JSX.Element
 }
 
 const contextStacks = new WeakMap<Context<any>, { defaultValue: unknown, stack: unknown[] }>()
@@ -109,11 +109,11 @@ export function createContext<T>(defaultValue: T): Context<T> {
       try {
         const result = children()
         if (result instanceof Node) {
-          return result
+          return result as JSX.Element
         }
         const fragment = document.createDocumentFragment()
         appendChildren(fragment, result)
-        return fragment
+        return fragment as unknown as JSX.Element
       } finally {
         stack.pop()
       }
@@ -300,10 +300,12 @@ function renderComponent(tag: Component, props: Props): Node {
 
 export namespace JSX {
   // TypeScript uses this type for every JSX expression. It cannot preserve
-  // the concrete return type of a function component here, so keep the DOM
-  // node type while allowing components to attach an `api` property for
+  // the concrete return type of a function component here, so use the DOM
+  // Element type while allowing components to attach an `api` property for
   // their own API, without opening up arbitrary properties on the node itself.
-  export type Element = Node & { api?: Record<string, any> }
+  // Fragments and text nodes are also typed as Element; narrow with
+  // `isElement` before calling element methods on a value that may be one.
+  export type Element = globalThis.Element & { api?: Record<string, any> }
 
   export type IntrinsicElements = {
     [K in keyof HTMLElementTagNameMap]: ElementProps<HTMLElementTagNameMap[K]>
@@ -315,6 +317,11 @@ export function jsx<P, R extends Node>(
   props: {} extends P ? P | null : P,
   _key?: string | number
 ): R
+export function jsx<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: ElementProps<HTMLElementTagNameMap[K]> | null,
+  _key?: string | number
+): HTMLElementTagNameMap[K]
 export function jsx(
   tag: string,
   props: Props | null,
@@ -322,13 +329,32 @@ export function jsx(
 ): Node
 export function jsx(
   tag: string | ((props: any) => Node),
-  props: Props | null,
+  props: any,
   _key?: string | number
 ): Node {
   return createElement(tag, props)
 }
 
 export const jsxs = jsx
+
+/**
+ * Narrows a rendered node to a specific element class, throwing if it is
+ * something else (e.g. a fragment). Replaces `as HTMLInputElement` casts.
+ */
+export function expectElement<T extends Element>(
+  node: Node,
+  constructor: abstract new (...args: any[]) => T
+): T {
+  if (!(node instanceof constructor)) {
+    throw new TypeError(`Expected ${constructor.name}, got ${node.nodeName}`)
+  }
+  return node
+}
+
+/** True when a rendered node is a real DOM Element (not a fragment or text). */
+export function isElement(node: unknown): node is JSX.Element {
+  return node instanceof Element
+}
 
 export function Fragment(props: Props): DocumentFragment {
   const fragment = document.createDocumentFragment()

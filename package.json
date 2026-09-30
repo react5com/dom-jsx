@@ -1,6 +1,6 @@
 {
   "name": "@react5/dom-jsx",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "JSX runtime for vanilla TS/JS projects.",
   "keywords": [
     "JSX"
@@ -18,6 +18,7 @@
   "type": "module",
   "files": [
     "dist",
+    "skills",
     "README.md",
     "LICENSE"
   ],

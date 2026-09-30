@@ -52,6 +52,54 @@ syntax needs `?.`. To get the component's exact, non-optional `api`
 type instead, call the component directly or call `jsx(Modal, null)` /
 `jsxDEV(Modal, null)`.
 
+### Element typing
+
+`JSX.Element` is the DOM `Element` type plus the optional `api`, so element
+methods such as `hasAttribute` and `toggleAttribute` are available on any JSX
+result. Fragments and text nodes are typed the same way even though they are
+not elements, so narrow before calling element methods on a value that may be
+one. Calling `jsx('input', props)` directly returns the specific element type
+(`HTMLInputElement`) with no cast.
+
+Components used as `<Comp />` must return `JSX.Element`, so a component typed
+as returning `Node` or `DocumentFragment` does not type-check.
+
+### Narrowing helpers
+
+`isElement(node)` is a type guard for "is this a real `Element`, not a
+fragment or text node":
+
+```tsx
+import { isElement } from '@react5/dom-jsx'
+
+const node = <>{maybeContent}</>
+if (isElement(node)) node.toggleAttribute('hidden', true)
+```
+
+`expectElement(node, Constructor)` narrows to a specific element class and
+throws a `TypeError` (`Expected HTMLInputElement, got DIV`) on mismatch. Use it
+instead of an unchecked `as` cast when JSX gives you a generic `JSX.Element`:
+
+```tsx
+import { expectElement } from '@react5/dom-jsx'
+
+const input = expectElement(<input value="Ada" />, HTMLInputElement)
+input.select() // typed as HTMLInputElement
+
+const canvas = expectElement(document.querySelector('#chart')!, HTMLCanvasElement)
+```
+
+Use cases:
+
+- Getting a specifically-typed element from a JSX expression without `as`.
+- Validating nodes from outside the runtime (`querySelector`, event targets,
+  third-party components) before using element-specific APIs.
+- Failing fast with a readable message if a component unexpectedly returns a
+  fragment or text node.
+
+`instanceof` checks are per-realm, so nodes from another window or iframe fail
+`expectElement`.
+
 ## Runtime behavior
 
 Intrinsic JSX tags become DOM elements. Prefer `className` over `class`, while both supported. `class` sets `className`, `style` accepts a style object, DOM properties are assigned when available, boolean attributes use presence semantics, and `onClick`-style function props become event listeners. Text, nested nodes, arrays, fragments, and function components are supported; `null`, `undefined`, and boolean children are ignored.
@@ -63,8 +111,7 @@ Handlers receive the DOM event with `currentTarget` typed as the element.
 The public entry points are:
 
 ```ts
-import { createRef, createContext, useContext, onCleanup, onDispose, dispose, jsx, jsxs, Fragment } from '@react5/dom-jsx'
-import { jsx, jsxs, jsxDEV, Fragment } from '@react5/dom-jsx/jsx-dev-runtime'
+import { createRef, createContext, useContext, onCleanup, onDispose, dispose, expectElement, isElement, svge, jsx, jsxs, Fragment } from '@react5/dom-jsx'
 ```
 
 `@react5/dom-jsx/jsx-runtime` also re-exports the same names and is what the TypeScript/Vite JSX transform imports automatically; `@react5/dom-jsx` is the shorter path for importing helpers like `createRef` directly in your own code.
@@ -91,7 +138,7 @@ const form = (
   <form>
     <input className="action-form__input" ref={inputRef} />
   </form>
-) as HTMLFormElement
+)
 
 inputRef.current // HTMLInputElement
 ```
@@ -140,7 +187,7 @@ Register cleanups with `onCleanup` in a component body, or with
 import { dispose, onCleanup, onDispose } from '@react5/dom-jsx'
 
 function Clock() {
-  const el = <time /> as HTMLTimeElement
+  const el = <time />
   const id = setInterval(() => { el.textContent = new Date().toLocaleTimeString() }, 1000)
   onCleanup(() => clearInterval(id))
   return el
@@ -175,6 +222,17 @@ props, unless those nodes are already in the document.
 handler or after an `await`; use `onDispose(node, fn)` there. Moving a node
 never disposes it. A node that is discarded without `dispose` keeps its
 cleanups until it is garbage-collected, and they never run.
+
+## AI agent skill
+
+The package ships an agent skill with usage guidance for this runtime (nodes, refs, element typing, context, cleanup) at `node_modules/@react5/dom-jsx/skills/jsx-dom/SKILL.md`. To use it, reference it from your project's `AGENTS.md` or `CLAUDE.md`:
+
+```md
+When writing or editing TSX that uses @react5/dom-jsx, follow
+node_modules/@react5/dom-jsx/skills/jsx-dom/SKILL.md.
+```
+
+For Claude Code, you can instead copy or symlink the `jsx-dom` folder into `.claude/skills/`.
 
 ## Development
 

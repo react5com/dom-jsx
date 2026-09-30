@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  expectElement,
   createContext,
   createRef,
   type Child,
@@ -21,7 +22,7 @@ describe('DOM JSX runtime', () => {
       disabled: true,
       value: 'Ada',
       style: { color: 'red', marginTop: '2px' }
-    }) as HTMLInputElement
+    })
 
     expect(element.outerHTML).toContain('id="name"')
     expect(element.className).toBe('field')
@@ -408,5 +409,17 @@ describe('DOM JSX runtime', () => {
 
   it('rejects onCleanup outside of a component render', () => {
     expect(() => onCleanup(() => {})).toThrow(Error)
+  })
+})
+
+describe('expectElement', () => {
+  it('narrows to the element class', () => {
+    const input = expectElement(jsx('input', null), HTMLInputElement)
+    expect(input.type).toBe('text')
+  })
+
+  it('throws on a mismatched node', () => {
+    expect(() => expectElement(document.createDocumentFragment(), HTMLElement))
+      .toThrow('Expected HTMLElement, got #document-fragment')
   })
 })
