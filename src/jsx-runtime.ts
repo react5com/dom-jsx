@@ -76,6 +76,43 @@ export type ElementProps<T extends HTMLElement> =
     ref?: Ref<T>
   }
 
+// SVG attributes are set as attributes, not properties (most SVG properties
+// are read-only animated values), so props are loosely typed.
+export type SVGElementProps<T extends SVGElement> =
+  EventProps<any> & {
+    class?: string
+    className?: string
+    style?: Partial<CSSStyleDeclaration>
+    children?: unknown
+    ref?: Ref<T>
+    [attribute: string]: unknown
+  }
+
+type SVGOnlyTagName = Exclude<keyof SVGElementTagNameMap, keyof HTMLElementTagNameMap>
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+// Children are created before their parent <svg>, so the namespace has to be
+// decided from the tag alone. Tags that also exist in HTML (a, script, style,
+// title) stay HTML.
+const svgTags = new Set<string>([
+  'svg', 'circle', 'clipPath', 'defs', 'desc', 'ellipse', 'feBlend',
+  'feColorMatrix', 'feComposite', 'feFlood', 'feGaussianBlur', 'feMerge',
+  'feMergeNode', 'feOffset', 'filter', 'foreignObject', 'g', 'image', 'line',
+  'linearGradient', 'marker', 'mask', 'metadata', 'path', 'pattern', 'polygon',
+  'polyline', 'radialGradient', 'rect', 'stop', 'switch', 'symbol', 'text',
+  'textPath', 'tspan', 'use', 'view'
+] satisfies SVGOnlyTagName[])
+
+// Tags that exist in both HTML and SVG are created as HTML, since the parent is
+// not known yet. They are rebuilt in the SVG namespace when appended to an SVG
+// parent, so what was applied to them is remembered for that.
+const ambiguousTags = new Set(['a', 'script', 'style', 'title'])
+
+type Origin = { listeners: [string, EventListener][], ref?: Ref<Element> }
+
+const origins = new WeakMap<Element, Origin>()
+
 export function createRef<T>(): { current: T | null } {
   return { current: null }
 }
@@ -308,6 +345,8 @@ export namespace JSX {
   export type Element = globalThis.Element & { api?: Record<string, any> }
 
   export type IntrinsicElements = {
+    [K in SVGOnlyTagName]: SVGElementProps<SVGElementTagNameMap[K]>
+  } & {
     [K in keyof HTMLElementTagNameMap]: ElementProps<HTMLElementTagNameMap[K]>
   }
 }
@@ -322,6 +361,11 @@ export function jsx<K extends keyof HTMLElementTagNameMap>(
   props: ElementProps<HTMLElementTagNameMap[K]> | null,
   _key?: string | number
 ): HTMLElementTagNameMap[K]
+export function jsx<K extends SVGOnlyTagName>(
+  tag: K,
+  props: SVGElementProps<SVGElementTagNameMap[K]> | null,
+  _key?: string | number
+): SVGElementTagNameMap[K]
 export function jsx(
   tag: string,
   props: Props | null,
@@ -372,14 +416,22 @@ function createElement(
     return renderComponent(tag, actualProps)
   }
 
-  const element = document.createElement(tag)
+  const isSvg = svgTags.has(tag)
+  const origin: Origin | undefined = ambiguousTags.has(tag)
+    ? { listeners: [] }
+    : undefined
+  const element = isSvg
+    ? document.createElementNS(SVG_NS, tag)
+    : document.createElement(tag)
 
   // className takes precedence over class when both are given, matching
   // React convention. Resolved up front so iteration order of actualProps
   // (an implementation detail) can't affect the outcome.
   if (actualProps.class !== undefined || actualProps.className !== undefined) {
-    element.className = String(
-      actualProps.className ?? actualProps.class ?? ''
+    // SVG elements have a read-only className, so use the attribute.
+    element.setAttribute(
+      'class',
+      String(actualProps.className ?? actualProps.class ?? '')
     )
   }
 
@@ -393,10 +445,9 @@ function createElement(
     }
 
     if (key.startsWith('on') && typeof value === 'function') {
-      element.addEventListener(
-        key.slice(2).toLowerCase(),
-        value as EventListener
-      )
+      const type = key.slice(2).toLowerCase()
+      element.addEventListener(type, value as EventListener)
+      origin?.listeners.push([type, value as EventListener])
       continue
     }
 
@@ -410,6 +461,13 @@ function createElement(
     }
 
     if (value == null) {
+      continue
+    }
+
+    if (isSvg) {
+      if (value !== false) {
+        element.setAttribute(key, value === true ? '' : String(value))
+      }
       continue
     }
 
@@ -440,13 +498,53 @@ function createElement(
   appendChildren(element, actualProps.children)
 
   const ref = actualProps.ref as Ref<Element> | undefined
+  if (origin) {
+    origin.ref = ref
+    origins.set(element, origin)
+  }
+  assignRef(ref, element)
+
+  return element
+}
+
+function assignRef(ref: Ref<Element> | undefined, element: Element): void {
   if (typeof ref === 'function') {
     ref(element)
   } else if (ref) {
     ref.current = element
   }
+}
 
-  return element
+function isSvgParent(parent: Node): boolean {
+  return parent instanceof Element && parent.namespaceURI === SVG_NS
+}
+
+// Rebuilds an HTML-created ambiguous element (e.g. <title>) in the SVG
+// namespace, carrying over attributes, listeners, ref, cleanups and children.
+function toSvg(element: Element): Element {
+  const origin = origins.get(element)
+  if (!origin || element.namespaceURI === SVG_NS) {
+    return element
+  }
+  origins.delete(element)
+
+  const svg = document.createElementNS(SVG_NS, element.localName)
+  for (const { name, value } of Array.from(element.attributes)) {
+    svg.setAttribute(name, value)
+  }
+  for (const [type, listener] of origin.listeners) {
+    svg.addEventListener(type, listener)
+  }
+  const list = cleanups.get(element)
+  if (list) {
+    cleanups.delete(element)
+    cleanups.set(svg, list)
+  }
+  for (const child of Array.from(element.childNodes)) {
+    appendChildren(svg, child)
+  }
+  assignRef(origin.ref, svg)
+  return svg
 }
 
 function appendChildren(
@@ -461,6 +559,18 @@ function appendChildren(
   }
 
   if (children instanceof Node) {
+    if (isSvgParent(parent)) {
+      if (children instanceof DocumentFragment) {
+        for (const child of Array.from(children.childNodes)) {
+          appendChildren(parent, child)
+        }
+        return
+      }
+      if (children instanceof Element) {
+        parent.appendChild(toSvg(children))
+        return
+      }
+    }
     parent.appendChild(children)
     return
   }

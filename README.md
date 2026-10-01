@@ -118,7 +118,21 @@ import { createRef, createContext, useContext, onCleanup, onDispose, dispose, ex
 
 ### SVG
 
-Use `svge()` function to load raw svg. With vite use raw import:
+SVG can be written inline in JSX. SVG tags (`svg`, `path`, `g`, `circle`, and so on) are created in the SVG namespace, and their props are set as attributes, so use SVG attribute names such as `viewBox` and `stroke-width`. `className`, `style`, `ref`, and event props work as usual.
+
+```tsx
+<svg viewBox="0 0 10 10" className="icon">
+  <path d="M0 0L10 10" stroke="currentColor" stroke-width={2} />
+</svg>
+```
+
+`a`, `script`, `style`, and `title` exist in both HTML and SVG. They are created as HTML and rebuilt in the SVG namespace when appended to an SVG parent through JSX, keeping attributes, listeners, ref, cleanups, and children. Limitations:
+
+- Inserting such an element into an SVG tree by hand (`svg.append(el)`) does not convert it.
+- A callback `ref` on one of these tags is called twice: first with the HTML element, then with the SVG one.
+- Values set as DOM properties rather than attributes (such as `innerHTML`) are not carried over.
+
+To load a raw SVG file, use `svge()`. With Vite use a raw import:
 
 ```ts
 import iconSvg from "./assets/icon.svg?raw"

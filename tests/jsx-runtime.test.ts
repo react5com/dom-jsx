@@ -423,3 +423,51 @@ describe('expectElement', () => {
       .toThrow('Expected HTMLElement, got #document-fragment')
   })
 })
+
+describe('inline svg', () => {
+  it('creates svg elements in the SVG namespace with attributes', () => {
+    const ref = createRef<SVGSVGElement>()
+    const svg = jsx('svg', {
+      ref,
+      viewBox: '0 0 10 10',
+      width: 10,
+      className: 'icon',
+      children: jsx('path', { d: 'M0 0L10 10', 'stroke-width': 2 })
+    })
+    expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    expect(svg.getAttribute('viewBox')).toBe('0 0 10 10')
+    expect(svg.getAttribute('width')).toBe('10')
+    expect(svg.getAttribute('class')).toBe('icon')
+    expect(ref.current).toBe(svg)
+    const path = svg.firstElementChild!
+    expect(path.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    expect(path.getAttribute('d')).toBe('M0 0L10 10')
+    expect(path.getAttribute('stroke-width')).toBe('2')
+  })
+})
+
+describe('inline svg ambiguous tags', () => {
+  it('rebuilds title and a in the SVG namespace inside svg', () => {
+    const onClick = vi.fn()
+    const ref = createRef<Element>()
+    const svg = jsx('svg', {
+      children: [
+        jsx('title', { children: 'Hi' }),
+        jsx('a', { href: '#x', onClick, ref, children: jsx('title', { children: 'T' }) })
+      ]
+    })
+    const [title, a] = Array.from(svg.children)
+    expect(title.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    expect(title.textContent).toBe('Hi')
+    expect(a.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    expect(a.getAttribute('href')).toBe('#x')
+    expect(a.firstElementChild!.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    expect(ref.current).toBe(a)
+    a.dispatchEvent(new Event('click'))
+    expect(onClick).toHaveBeenCalledOnce()
+  })
+
+  it('leaves html title alone outside svg', () => {
+    expect(jsx('title', {}).namespaceURI).toBe('http://www.w3.org/1999/xhtml')
+  })
+})
