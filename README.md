@@ -140,6 +140,8 @@ const icon = svge(iconSvg)
 <div>{icon}</div>
 ```
 
+`svge()` parses the markup as HTML, so the `xmlns` attribute is optional, and it returns the first element, which must be an `<svg>`. It is not a strict XML parser: malformed markup is repaired rather than rejected, and anything after the first element is ignored. It throws only when the first element is not an `<svg>`. The returned element gets `aria-hidden="true"` and `focusable="false"`.
+
 ### Refs
 
 Capture the created DOM node without a later `querySelector` call using `createRef` or a callback ref:

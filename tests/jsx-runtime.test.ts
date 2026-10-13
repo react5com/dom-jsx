@@ -10,6 +10,7 @@ import {
   jsxs,
   onCleanup,
   onDispose,
+  svge,
   useContext
 } from '../src/jsx-runtime'
 import { jsxDEV } from '../src/jsx-dev-runtime'
@@ -469,5 +470,33 @@ describe('inline svg ambiguous tags', () => {
 
   it('leaves html title alone outside svg', () => {
     expect(jsx('title', {}).namespaceURI).toBe('http://www.w3.org/1999/xhtml')
+  })
+})
+
+describe('svge', () => {
+  const NS = 'http://www.w3.org/2000/svg'
+
+  it('parses markup without xmlns into the SVG namespace', () => {
+    const icon = svge('<svg viewBox="0 0 10 10"><path d="M0 0L10 10"/></svg>')
+    expect(icon).toBeInstanceOf(SVGSVGElement)
+    expect(icon.namespaceURI).toBe(NS)
+    expect(icon.getAttribute('viewBox')).toBe('0 0 10 10')
+    expect(icon.firstElementChild!.namespaceURI).toBe(NS)
+  })
+
+  it('trims surrounding whitespace and marks the icon decorative', () => {
+    const icon = svge('\n  <svg xmlns="http://www.w3.org/2000/svg"></svg>\n')
+    expect(icon.getAttribute('aria-hidden')).toBe('true')
+    expect(icon.getAttribute('focusable')).toBe('false')
+    expect(icon.parentNode).toBeNull()
+  })
+
+  it('returns an element owned by the main document', () => {
+    expect(svge('<svg></svg>').ownerDocument).toBe(document)
+  })
+
+  it('throws when the markup is not an svg element', () => {
+    expect(() => svge('<div></div>')).toThrow('svge: failed to parse SVG markup')
+    expect(() => svge('')).toThrow('svge: failed to parse SVG markup')
   })
 })

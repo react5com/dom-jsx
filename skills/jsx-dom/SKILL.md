@@ -14,7 +14,7 @@ Read [the package README](../../README.md) when you need API details, especially
 - Use JSX for node creation. Use `createRef` or a callback `ref` to retain nested nodes a component owns, instead of finding them later with `querySelector`. A component's top-level node needs no ref, since the component returns it.
 - Intrinsic tags produce DOM elements. Prefer `className`, a style object for `style`, and camel-cased event props such as `onMouseEnter` and `onKeyDown`. Boolean attributes use presence semantics.
 - Inline SVG works in JSX (`<svg viewBox="0 0 10 10"><path d="..." /></svg>`). Use SVG attribute names (`viewBox`, `stroke-width`); props are set as attributes. `a`, `script`, `style`, and `title` inside `<svg>` are converted automatically when appended through JSX, but not when inserted by hand with DOM methods.
-- Use the `svge()` function to load raw SVG. With Vite use a `?raw` import.
+- Use the `svge()` function to load raw SVG. With Vite use a `?raw` import. `xmlns` is optional; markup is parsed leniently as HTML (malformed input is repaired, content after the first element is ignored) and it throws only if the first element is not `<svg>`. The result gets `aria-hidden="true"` and `focusable="false"`.
 - Components can return a DOM node with an attached `api` object to expose methods or properties to the parent. In TSX, `<Component />` exposes `api` as optional and loosely typed; call the component directly or use `jsx(Component, null)` when the exact API type matters.
 
 ## Element typing

@@ -588,12 +588,14 @@ function appendChildren(
 }
 
 export function svge(markup: string): SVGSVGElement {
-  const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml')
-  const root = parsed.documentElement
-  if (root.nodeName === 'parsererror' || root.namespaceURI !== 'http://www.w3.org/2000/svg') {
+  // Parse as HTML so the SVG namespace is assigned without requiring xmlns.
+  const template = document.createElement('template')
+  template.innerHTML = markup.trim()
+  const root = template.content.firstElementChild
+  if (!(root instanceof SVGSVGElement)) {
     throw new Error(`svge: failed to parse SVG markup: ${markup}`)
   }
-  const icon = document.importNode(root, true) as unknown as SVGSVGElement
+  const icon = document.adoptNode(root)
   icon.setAttribute('aria-hidden', 'true')
   icon.setAttribute('focusable', 'false')
   return icon
